@@ -23,6 +23,17 @@ public struct Asset {
         self.info = info
     }
 
+    public func copyIdentity(_ asset: Asset) -> Asset? {
+        asset.asset.map {
+            Asset(
+                asset: $0,
+                id: asset.id,
+                image: nil,
+                info: nil
+            )
+        }
+    }
+
     /* info keys:
      let PHImageResultIsInCloudKey: String
         A key whose value indicates whether photo asset data is stored on the local device or must be downloaded from iCloud.
