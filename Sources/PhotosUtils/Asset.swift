@@ -16,6 +16,30 @@ public struct Asset {
     public var creationDate: Date? { asset?.creationDate }
     public var location: CLLocation? { asset?.location }
 
+    public var isPhoto: Bool {
+        asset.map { $0.mediaType == .image } ?? false
+    }
+
+    public var isHDR: Bool {
+        isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoHDR) } ?? false)
+    }
+
+    public var isSelfie: Bool {
+        isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoDepthEffect) } ?? false )
+    }
+
+    public var isLive: Bool {
+        isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoLive) } ?? false )
+    }
+
+    public var isPanorama: Bool {
+        isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoPanorama) } ?? false )
+    }
+
+    public var isScreenshot: Bool {
+        isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoScreenshot) } ?? false )
+    }
+
     public init?(id: String, image: UIImage?, info: [AnyHashable: Any]?) {
         self.asset = nil
         self.id = id
