@@ -1,10 +1,7 @@
 
 import Photos
 import UIKit
-
-#if canImport(Combine)
 import Combine
-#endif
 
 /**
     Authorize for using Photos
@@ -17,29 +14,23 @@ public func authorize(
     for accessLevel: PHAccessLevel
 ) -> AnyPublisher<PHAuthorizationStatus, Never> {
 
-    let subject = PassthroughSubject<PHAuthorizationStatus, Never>()
-
-    // return subject before process status
-    DispatchQueue.global(qos: .userInteractive).async {
+    Future<PHAuthorizationStatus, Never> { promise in
         let status = PHPhotoLibrary.authorizationStatus(for: accessLevel)
         switch status {
         case .notDetermined:
             PHPhotoLibrary.requestAuthorization(for: accessLevel) { status in
-                subject.send(status)
+                promise(.success(status))
             }
         case .authorized, .limited, .denied, .restricted:
-            subject.send(status)
+            promise(.success(status))
 
         @unknown default:
             assertionFailure("unknown authorization status")
         }
     }
-
-    return subject
-        .removeDuplicates()
-        .drop(while: { $0 == .notDetermined })
-        .receive(on: DispatchQueue.main)
-        .eraseToAnyPublisher()
+    .drop(while: { $0 == .notDetermined })
+    .removeDuplicates()
+    .eraseToAnyPublisher()
 }
 
 /**
@@ -50,29 +41,23 @@ public func authorize(
 @available(iOS 13, *)
 public func authorize() -> AnyPublisher<PHAuthorizationStatus, Never> {
 
-    let subject = PassthroughSubject<PHAuthorizationStatus, Never>()
-
-    // return subject before process status
-    DispatchQueue.global(qos: .userInteractive).async {
+    Future<PHAuthorizationStatus, Never> { promise in
         let status = PHPhotoLibrary.authorizationStatus()
         switch status {
         case .notDetermined:
             PHPhotoLibrary.requestAuthorization { status in
-                subject.send(status)
+                promise(.success(status))
             }
         case .authorized, .limited, .denied, .restricted:
-            subject.send(status)
+            promise(.success(status))
 
         @unknown default:
             assertionFailure("unknown authorization status")
         }
     }
-
-    return subject
-        .removeDuplicates()
-        .drop(while: { $0 == .notDetermined })
-        .receive(on: DispatchQueue.main)
-        .eraseToAnyPublisher()
+    .drop(while: { $0 == .notDetermined })
+    .removeDuplicates()
+    .eraseToAnyPublisher()
 }
 
 /**
@@ -89,9 +74,8 @@ public func fetchAssets(
     subtypes: PHAssetMediaSubtype = [],
     sortDescriptors: [NSSortDescriptor] = [.init(keyPath: \PHAsset.creationDate, ascending: false)]
 ) -> AnyPublisher<[Asset], Never> {
-    let subject = PassthroughSubject<[PHAsset], Never>()
 
-    DispatchQueue.global(qos: .background).async {
+    Future<[Asset], Never> { promise in
         let options = PHFetchOptions()
         options.sortDescriptors = sortDescriptors
         options.includeAssetSourceTypes = sourceTypes
@@ -101,18 +85,17 @@ public func fetchAssets(
         }
 
         let result = PHAsset.fetchAssets(with: options)
-        var assets = [PHAsset]()
+        var assets = [Asset]()
         assets.reserveCapacity(result.count)
         result.enumerateObjects { (asset, index, stop) in
-            assets.append(asset)
+            assets.append(
+                Asset(asset: asset, id: asset.localIdentifier, image: nil, info: nil)
+            )
         }
 
-        subject.send(assets)
+        promise(.success(assets))
     }
-
-    return subject
-        .map { $0.compactMap { Asset(asset: $0, id: $0.localIdentifier, image: nil, info: nil) } }
-        .eraseToAnyPublisher()
+    .eraseToAnyPublisher()
 }
 
 /**
@@ -130,52 +113,32 @@ public func fetchAsset(
     contentMode: PHImageContentMode = .default,
     options: PHImageRequestOptions = .fast()
 ) -> AnyPublisher<Asset, Never> {
-    let subject = PassthroughSubject<Asset, Never>()
 
-    DispatchQueue.global(qos: .background).async {
+    Future<Asset, Never> { promise in
         guard let primitive = asset.asset else {
-            subject.send(asset)
+            promise(.success(asset))
             return
         }
 
-        fetchAsset(
-            primitive,
-            targetSize: targetSize,
-            contentMode: contentMode,
-            options: options,
-            subject: subject
-        )
-    }
+        PHImageManager.default()
+            .requestImage(
+                for: primitive,
+                targetSize: targetSize,
+                contentMode: contentMode,
+                options: options
+            ) { image, info in
 
-    return subject
-        .eraseToAnyPublisher()
-}
-
-internal func fetchAsset<Subject>(
-    _ asset: PHAsset,
-    targetSize: CGSize,
-    contentMode: PHImageContentMode,
-    options: PHImageRequestOptions,
-    subject: Subject
-) where Subject: Combine.Subject,
-        Subject.Output == Asset,
-        Subject.Failure == Never
-{
-    PHImageManager.default()
-        .requestImage(
-            for: asset,
-            targetSize: targetSize,
-            contentMode: contentMode,
-            options: options
-        ) { image, info in
-
-            subject.send(
-                Asset(
-                    asset: asset,
-                    id: asset.localIdentifier,
-                    image: image,
-                    info: info
+                promise(
+                    .success(
+                        Asset(
+                            asset: primitive,
+                            id: primitive.localIdentifier,
+                            image: image,
+                            info: info
+                        )
+                    )
                 )
-            )
-        }
+            }
+    }
+    .eraseToAnyPublisher()
 }
