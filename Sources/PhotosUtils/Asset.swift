@@ -47,11 +47,13 @@ public struct Asset {
         self.info = info
     }
 
-    public func copyIdentity(_ asset: Asset) -> Asset? {
-        asset.asset.map {
+    /* copies identity without image and info dict
+     */
+    public func copyIdentity() -> Asset? {
+        asset.map {
             Asset(
                 asset: $0,
-                id: asset.id,
+                id: $0.localIdentifier,
                 image: nil,
                 info: nil
             )
