@@ -24,7 +24,7 @@ public struct Asset {
         isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoHDR) } ?? false)
     }
 
-    public var isSelfie: Bool {
+    public var isPortrait: Bool {
         isPhoto && (asset.map { $0.mediaSubtypes.contains(.photoDepthEffect) } ?? false )
     }
 
